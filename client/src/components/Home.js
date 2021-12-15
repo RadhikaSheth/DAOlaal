@@ -62,18 +62,26 @@ export default function Home({ web3, accounts, tokenContract, callerContract }) 
     const [price, setPrice] = useState(0);
     const [balance, setBalance] = useState(0);
     const [inrPrice, setInrPrice] = useState(0);
+    const [collateralRatio, setRatio] = useState(1.5);
+    const [currentCollateral, setCollateral] = useState(0);
+    const [maticToInrRatio, setMaticToInr] = useState(0);
     useEffect(() => {
         if (callerContract != null && ispriceFetched == false) {
             getPrice();
-            console.log("here");
         }
     }, [{ callerContract }])
 
     async function getPrice() {
         const updatePrice = callerContract.methods.updatePrice(mintSymbol).send({ from: accounts[0] });
-        const price = await callerContract.methods.readUpdatedprice(mintSymbol).call();
-        const balance = await tokenContract.methods.viewBalance(mintSymbol, accounts[0]).call();
-        const inrPrice = await callerContract.methods.readPrice().call();
+        var price = await callerContract.methods.readUpdatedprice(mintSymbol).call();
+        var balance = await tokenContract.methods.viewBalance(mintSymbol, accounts[0]).call();
+        balance /= 10000000000;
+        var collateral = await tokenContract.methods.getCollateral(accounts[0]).call();
+        collateral/= 10000000000;
+        const inrPrice = await callerContract.methods.readPrice(mintSymbol).call();
+        const maticToInr = await callerContract.methods.maticToInr().call();
+        setMaticToInr(maticToInr);
+        setCollateral(collateral);
         setInrPrice(inrPrice);
         setBalance(balance);
         setPrice(price);
@@ -92,18 +100,36 @@ export default function Home({ web3, accounts, tokenContract, callerContract }) 
     function handleBurnSymbol(event) {
         setBurnSymbol(event.target.value);
     }
+    function handleCollateralRation(event) {
+        setRatio(event.target.value);
+    }
     async function mint() {
         const amount = web3.utils.toWei(mintQuantity);
-        await tokenContract.methods.buyToken(mintSymbol, price, accounts[0]).send({ from: accounts[0], value: amount * price, to: '0xA963aB65320C16a581eeb264125C5fF1FcE58985' });
-        // await tokenContract.methods.incCollateral(accounts[0], price).send({ from: accounts[0] });
-        const balance = await tokenContract.methods.viewBalance(mintSymbol, accounts[0]).call();
+        await tokenContract.methods.buyToken(mintSymbol, mintQuantity * 10000000000, accounts[0]).send({ from: accounts[0], value: amount * price * collateralRatio, to: '0xA963aB65320C16a581eeb264125C5fF1FcE58985' });
+        console.log("mint quantity",mintQuantity);
+        console.log("price",price);
+        console.log("col ratio",collateralRatio);
+        console.log("mToInr ratio",maticToInrRatio);
+        console.log(Math.trunc(mintQuantity* price * collateralRatio *maticToInrRatio* 10000000000));
+        await tokenContract.methods.incCollateral(accounts[0], Math.trunc(mintQuantity* price * collateralRatio *maticToInrRatio* 10000000000)).send({ from: accounts[0] });
+        var balance = await tokenContract.methods.viewBalance(mintSymbol, accounts[0]).call();
+        var collateral = await tokenContract.methods.getCollateral(accounts[0]).call();
+        collateral/= 10000000000;
+        balance /= 10000000000;
+        console.log(collateral);
+        setCollateral(collateral);
         setBalance(balance);
         setMintQuantity(0);
     }
     async function burn() {
-        await tokenContract.methods.burnToken(burnSymbol, burnQuantity, accounts[0]).send({ from: accounts[0] });
-        // await tokenContract.methods.decCollateral(accounts[0], price).send({ from: accounts[0] });
-        const balance = await tokenContract.methods.viewBalance(mintSymbol, accounts[0]).call();
+        await tokenContract.methods.burnToken(burnSymbol, burnQuantity * 10000000000, accounts[0]).send({ from: accounts[0] });
+        await tokenContract.methods.decCollateral(accounts[0], mintQuantity* price * collateralRatio *maticToInrRatio* 10000000000).send({ from: accounts[0] });
+        var balance = await tokenContract.methods.viewBalance(mintSymbol, accounts[0]).call();
+        var collateral = await tokenContract.methods.getCollateral(accounts[0]).call();
+        collateral/= 10000000000;
+        setCollateral(collateral);
+        console.log(collateral);
+        balance /= 10000000000;
         setBalance(balance);
         setBurnQuantity(0);
     }
@@ -135,15 +161,27 @@ export default function Home({ web3, accounts, tokenContract, callerContract }) 
                                     <StyledText variant="h4" >
                                         Mint
                                     </StyledText>
-                                    <Grid container pt={3}>
-                                        <Grid item xs={6}>
+                                    <Grid container pt={3} pb={1}>
+                                        <Grid item xs={3}>
                                             <Input
+                                                type="number"
+                                                inputProps={{ min: "0" }}
                                                 placeholder="Quantity"
                                                 onChange={handleMintQuantity}
                                             />
                                         </Grid>
-                                        <Grid item pl={2}>
+                                        <Grid item xs={4} pl={2}>
+                                            <Input
+                                                variant="standard"
+                                                type="number"
+                                                inputProps={{ min: "1.5", step: "0.5" }}
+                                                placeholder="Collateral Ratio"
+                                                onChange={handleCollateralRation}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={3} pl={3}>
                                             <Select
+                                                variant="standard"
                                                 value={mintSymbol}
                                                 label="Symbol"
                                                 onChange={handleMintSymbol}
@@ -152,7 +190,7 @@ export default function Home({ web3, accounts, tokenContract, callerContract }) 
                                             </Select>
                                         </Grid>
                                     </Grid>
-                                    <Typography variant="subtitle1" > Value: {mintQuantity > 0 ? mintQuantity * price : 0} MATIC</Typography>
+                                    <Typography variant="subtitle1" > Value: {mintQuantity > 0 ? (mintQuantity * price * collateralRatio).toFixed(2) : 0} MATIC &nbsp; &nbsp; Collateral Ratio: {collateralRatio}</Typography>
                                     <StyledButton variant="outlined" onClick={mint}>Mint</StyledButton>
                                 </Item>
                             </Grid>
@@ -170,6 +208,7 @@ export default function Home({ web3, accounts, tokenContract, callerContract }) 
                                         </Grid>
                                         <Grid item pl={2}>
                                             <Select
+                                                variant="standard"
                                                 value={burnSymbol}
                                                 label="Symbol"
                                                 onChange={handleBurnSymbol}
@@ -178,7 +217,7 @@ export default function Home({ web3, accounts, tokenContract, callerContract }) 
                                             </Select>
                                         </Grid>
                                     </Grid>
-                                    <Typography variant="subtitle1" > Value: {burnQuantity > 0 ? burnQuantity * price : 0} MATIC</Typography>
+                                    <Typography variant="subtitle1" > Value: {burnQuantity > 0 ? (burnQuantity * price).toFixed(2) : 0} MATIC</Typography>
                                     <StyledButton variant="outlined" onClick={burn}>Burn</StyledButton>
                                 </Item>
                             </Grid>
@@ -186,42 +225,52 @@ export default function Home({ web3, accounts, tokenContract, callerContract }) 
                     </Grid>
                     <Grid item xs={6}>
                         <Grid container justifyContent="center">
-                            <Grid item xs={10} >
+                            <Grid item xs={11} >
                                 <BalanceGrid variant="outlined">
                                     <StyledText variant="h4" >
                                         Balance
                                     </StyledText>
                                     <Grid container justifyContent="space-between" pt={5} pb={1}>
-                                        <Grid item xs={4}>
+                                        <Grid item xs={3}>
                                             <Grid container justifyContent="center">
                                                 <Typography variant='h6' fontWeight="bold">Name</Typography>
                                             </Grid>
                                         </Grid>
-                                        <Grid item xs={4}>
+                                        <Grid item xs={3}>
                                             <Grid container justifyContent="center">
                                                 <Typography variant='h6' fontWeight="bold">Symbol</Typography>
                                             </Grid>
                                         </Grid>
-                                        <Grid item xs={4}>
+                                        <Grid item xs={3}>
                                             <Grid container justifyContent="center">
                                                 <Typography variant='h6' fontWeight="bold">Quantity</Typography>
                                             </Grid>
                                         </Grid>
+                                        <Grid item xs={3}>
+                                            <Grid container justifyContent="center">
+                                                <Typography variant='h6' fontWeight="bold">Collateral %</Typography>
+                                            </Grid>
+                                        </Grid>
                                     </Grid>
                                     <Grid container justifyContent="space-between" >
-                                        <Grid item xs={4}>
+                                        <Grid item xs={3}>
                                             <Grid container justifyContent="center">
                                                 <Typography>{mintSymbol}</Typography>
                                             </Grid>
                                         </Grid>
-                                        <Grid item xs={4}>
+                                        <Grid item xs={3}>
                                             <Grid container justifyContent="center">
                                                 <Typography>{mintSymbol}</Typography>
                                             </Grid>
                                         </Grid>
-                                        <Grid item xs={4}>
+                                        <Grid item xs={3}>
                                             <Grid container justifyContent="center">
-                                                <Typography>{balance}</Typography>
+                                                <Typography>{balance.toFixed(2)}</Typography>
+                                            </Grid>
+                                        </Grid>
+                                        <Grid item xs={3}>
+                                            <Grid container justifyContent="center">
+                                                <Typography>{currentCollateral > 0 ? (currentCollateral/(balance*inrPrice)).toFixed(1) : 0}</Typography>
                                             </Grid>
                                         </Grid>
                                     </Grid>
@@ -237,10 +286,9 @@ export default function Home({ web3, accounts, tokenContract, callerContract }) 
                         Swap
                     </StyledTitle>
                     <iframe
-                        src="https://app.uniswap.org/#/swap?theme=dark&inputCurrency=0x7d1afa7b718fb893db30a3abc0cfc608aacfebb0"
+                        src="https://app.uniswap.org/#/swap?theme=dark"
                         height="400px"
                         width='93%'
-                        id="myId"
                     />
                 </Grid>
             </Box>

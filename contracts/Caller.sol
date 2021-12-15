@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0;
 
-import "./matic_usdt.sol";
+import "./matic_usd.sol";
 import "./usdt_inr.sol";
 import "./Price.sol";
-import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
+import "https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ChainlinkClient.sol";
 
-interface IMaticToUsdt {
+interface IMaticToUsd {
     function getLatestPrice() external returns(int);
     // function getPrice() external returns (bytes32 requestId);
     // function readPrice() external view returns(uint256);
@@ -33,26 +33,25 @@ contract Caller is ChainlinkClient {
     address private oracle;
     bytes32 private jobId;
     uint256 private fee;
-    uint256 private mToU;
+    uint256 public mToU;
     uint256 private UToI;
     uint256 private price;
-    address private addressUsdtToInr = 0x49B488255c8b15B29F4382d5F64235E9ff78fA0D;
-    address private addressMaticToUsdt = 0xb7290de5DaD7092E61FEBAaED8c786E4A90764b7;
-    address private addressPrice = 0xda4DeC7D31a9DA9be01466314aE661B8Ac5DcdFC;
+    address private addressUsdtToInr = 0x7CA0C41767d830A94798a0A42648af533c1b721f;
+    address private addressMaticToUsdt = 0x6284298047b29Cf304B8F96EfEc96ff3D68B92aa;
+    address private addressPrice = 0xd6849312155313d47647E36CEb1ece771747e807;
     mapping(string => uint256) private map;
     uint256 public finalMatic;
     constructor() {
 
     }
 
-    function readPrice() public view returns(uint256) {
-        return price;
+    function readPrice(string memory symbol) public view returns(uint256) {
+        return IPrice(addressPrice).readPrice(symbol);
     }
 
-    // function getMaticToUsdt() public returns(bool){
-    //     IMaticToUsdt(addressMaticToUsdt).getLatestPrice();
-    //     return true;
-    // }
+    function getMaticToUsdt() public returns(uint256){
+        return uint256(IMaticToUsd(addressMaticToUsdt).getLatestPrice());
+    }
 
     // function readMaticToUsdt() public view returns(uint256){
     //     return IMaticToUsdt(addressMaticToUsdt).getLatestPrice();
@@ -68,7 +67,7 @@ contract Caller is ChainlinkClient {
     }
 
     function updatePrice(string memory symbol) public returns(uint256){
-        mToU = uint256(IMaticToUsdt(addressMaticToUsdt).getLatestPrice());
+        mToU = uint256(IMaticToUsd(addressMaticToUsdt).getLatestPrice());
         emit mtouevent(mToU); // log the current value
         UToI = IUsdtToInr(addressUsdtToInr).readPrice();
         emit utoievent(UToI); // log the current value
@@ -85,5 +84,10 @@ contract Caller is ChainlinkClient {
     function readUpdatedprice(string memory symbol) public view returns (uint256){
         return map[symbol];
     }
+
+    function maticToInr() public view returns(uint256){
+        return (mToU/100000000)*UToI;
+    }
+
 
 }

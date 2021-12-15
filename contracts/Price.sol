@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0;
 
-// import "./matic_usdt.sol";
-// import "./usdt_inr.sol";
-import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
+import "./matic_usdt.sol";
+import "./usdt_inr.sol";
+import "https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ChainlinkClient.sol";
 
 contract Price is ChainlinkClient {
     using Chainlink for Chainlink.Request;

@@ -2,7 +2,7 @@
 pragma solidity >=0.8.0;
 
 
-import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
+import "https://github.com/smartcontractkit/chainlink/blob/develop/contracts/src/v0.8/ChainlinkClient.sol";
 contract MaticToUsdt is ChainlinkClient {
     using Chainlink for Chainlink.Request;
     uint256 public price;

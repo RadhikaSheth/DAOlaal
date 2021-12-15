@@ -2,6 +2,7 @@
 pragma solidity >=0.8.0;
 
 import "./Token.sol";
+import "./Caller.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.4/contracts/token/ERC20/utils/SafeERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/release-v4.4/contracts/access/Ownable.sol";
 
@@ -49,7 +50,6 @@ contract TokenFactory is Ownable {
         //     createToken(symbol, symbol, supply);
         // }
         append(symbol, supply);
-        collateralMap[addr] += supply;
         return true;
     }
 
@@ -59,7 +59,6 @@ contract TokenFactory is Ownable {
                       
     function burnToken(string memory symbol, uint256 supply, address addr)public returns(bool){
         tokenMap[symbol].burnToken(msg.sender,supply);
-        collateralMap[addr] -= supply;
         return true;
     }
 
@@ -68,4 +67,24 @@ contract TokenFactory is Ownable {
          return t.transferToken(receiver, amount);
     }
 
+    function incCollateral(address addr, uint256 amount) public returns(bool){
+        collateralMap[addr] += amount;
+        return(true);
+    }
+
+    function decCollateral(address addr, uint256 amount) public returns(bool){
+        collateralMap[addr] -= amount;
+        return(true);
+    }
+
+    function liquidateCollateral(string memory symbol, uint256 liquidateRatio, address addr) public returns(bool){
+        collateralMap[addr] = collateralMap[addr]*(1-liquidateRatio);
+        uint256 liquidCollateralAmount = collateralMap[addr]*liquidateRatio;
+        Caller caller = new Caller();
+        uint256 liquidCollateralMatic = liquidCollateralAmount/caller.maticToInr();
+        burnToken(symbol, addr, liquidCollateralMatic);
+        append(symbol,liquidCollateralMatic);
+        return true;
+    }
+    
 }
